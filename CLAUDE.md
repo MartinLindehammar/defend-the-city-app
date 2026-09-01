@@ -2734,6 +2734,112 @@ person requesting it in case it was an unintentional repeat rather than
 an intentional further reduction. Archer range reduced by a flat 2
 (9→7).
 
+## Publishing: rename, GitHub, Vercel, Supabase, PostHog
+
+The project was renamed **City Defense → Defend The City** and prepared
+for a public deployment. Three optional integrations were added. The
+single most important architectural rule applied throughout: **every
+integration is self-disabling.** With no environment variables set, the
+game runs exactly as it did before — the leaderboard and feedback buttons
+are hidden rather than present-and-broken, and analytics is a no-op. A
+fresh clone is playable immediately, and a preview deploy missing its env
+vars degrades to "just the game" rather than to a crash.
+
+### The rename, and why saves still work
+
+`package.json`, `.claude/launch.json`, the page title, and both
+localStorage keys were renamed. The progress key is the one that mattered:
+`loadProgress` now falls back to the old `city-defense-progress-v1` when
+the new key is empty, and `resetProgress` clears BOTH. That second half is
+easy to miss and load-bearing — clearing only the current key would leave
+the legacy save behind for the very next load to fall back to, i.e. a
+reset that silently undoes itself. Three regression tests cover it
+(migration works, the current key wins when both exist, reset clears
+both). The intro-modal "seen" flag was deliberately NOT migrated: showing
+the how-to-play once more after a relaunch is harmless, arguably correct.
+
+### Leaderboard and feedback (`src/backend.js`, `supabase/schema.sql`)
+
+Two tables with row-level security: `leaderboard` is publicly readable and
+insert-only; `feedback` is insert-only with **no select policy at all**, so
+one player can never read another's messages. Neither table has an update
+or delete policy — with RLS on, an operation with no permissive policy is
+denied, so submitted rows are immutable from the client.
+
+Scores are submitted on trust. The game is entirely client-side, so the
+anon key and every request are visible in devtools and a determined person
+can post anything. This was an explicit, informed choice ("keep it
+simple") for a friends-and-family board, and the schema comments state it
+plainly rather than implying a security property the design doesn't have.
+What the CHECK constraints genuinely do provide is protection against
+unbounded junk (a 10MB "name", a negative level).
+
+**Rendering the leaderboard is the one real security concern**, and it's
+XSS, not cheating: `player_name` is text typed by other people. Rows are
+built as real DOM nodes with `textContent`, never `innerHTML`. Verified
+visually with a `Ada<script>` entry rendering as literal characters.
+
+### Two real bugs found by testing, not by inspection
+
+**1. Unreachable-backend requests hung for ~25 seconds.** Measured, not
+assumed: pointing the client at a non-existent Supabase project left the
+panel on "Loading…" for 25s before failing. Fixed with an 8-second
+`AbortSignal.timeout` injected through supabase-js's `global.fetch`
+option, combined with any caller-supplied signal via `AbortSignal.any`
+(with a fallback for browsers lacking it — degraded, never broken).
+
+**2. Error translation was wired to the wrong path.** The first fix
+translated errors only in `catch` blocks — and it never fired, because
+**supabase-js does not throw on network failure**. It catches internally
+and returns the failure as a normal `{ error }` result whose message is
+the stringified original. So players saw a raw "TypeError: Failed to
+fetch" on screen. Fixed by running the same translation over returned
+errors as well as thrown ones. This was only caught by actually clicking
+the button against a dead backend; reading the code would not have
+revealed it, and the first attempt looked correct.
+
+### A pre-existing e2e failure, surfaced (not caused) by this round
+
+`test-e2e.mjs` failed on first run here with "no defenders placed." The
+cause was **not** the rename: Puppeteer starts from a fresh profile, so
+localStorage is empty, so the how-to-play modal opens automatically — and
+it is a full-viewport overlay that silently swallows every placement
+click. Confirmed directly with `elementFromPoint` at the exact coordinates
+the test clicks, which reported `intro-modal` rather than the canvas. The
+key's *name* cannot matter when the profile has no keys at all, so this
+had been failing since that modal was added. Fixed in the test (dismiss
+the modal, as a real player does) plus a new assertion that fails at the
+real cause — "no defenders were placed" — instead of letting it surface
+later as a confusing "battle didn't start."
+
+### Analytics (`src/analytics.js`)
+
+PostHog with `respect_dnt: true`, `autocapture: false` (the game is one
+long-lived page; clicking noise would drown the signal), and
+`person_profiles: "identified_only"` since every player is anonymous and
+per-visitor profiles would inflate billing for data that can never be tied
+to anyone. Event names are exported constants, so a typo becomes a build
+error rather than a silently-separate event that splits a chart in two.
+Instrumented: level started/completed, run ended, upgrade and population
+purchases, score submitted, leaderboard opened, feedback submitted,
+progress reset.
+
+### Deliberately not built
+
+**Resend "tell a friend" was skipped**, by explicit decision. It needs a
+verified sending domain — without one Resend only delivers to your own
+address — and no custom domain exists yet. Revisit once a domain is
+bought; nothing in the current code needs to change to accommodate it
+later.
+
+### Repo hygiene
+
+`nature assets/` (36MB raw Kenney download) is gitignored — the models the
+game actually loads are already copied into `public/models/`, which IS
+referenced and is committed. Note that CLAUDE.md previously described
+`MODEL_NAMES` as emptied and `public/models` as unreferenced; that is
+stale — both are live again.
+
 ## File structure
 - `index.html` — page shell + UI overlay (loading screen, topbar with reset
   button, unit selector, instructions, result banner)
