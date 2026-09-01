@@ -1,0 +1,35 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Local environment variables — real keys, never committed.
+.env
+.env.local
+.env.*.local
+
+# Raw Kenney asset pack (36MB source download). The models the game
+# actually loads are already copied into public/models/ — this folder is
+# the original archive kept locally for picking future assets out of, and
+# there's no reason to carry it in git.
+nature assets/

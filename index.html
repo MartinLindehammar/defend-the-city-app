@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <link rel="icon" href="data:,">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Defend The City</title>
+    <meta name="description" content="Defend The City — a browser strategy game. Place your defenders, then watch the battle play out. Survive as many waves as you can." />
+    <meta property="og:title" content="Defend The City" />
+    <meta property="og:description" content="Place your defenders, then watch the battle play out. How many waves can you survive?" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <div id="loading-screen">
+      <div id="loading-text">Loading assets… 0%</div>
+    </div>
+
+    <div id="ui">
+      <div id="topbar">
+        <div id="topbar-left">
+          <div id="level-indicator">Level <span id="level-value">1</span> · <span id="level-type-value">Normal</span></div>
+        </div>
+        <div id="city-health-row" title="City Health — if raiders reach the city and this hits 0, the game ends">
+          <span id="city-health-label">City</span>
+          <div id="city-health-track">
+            <div id="city-health-fill"></div>
+          </div>
+          <span id="city-health-value">100.0%</span>
+        </div>
+        <div id="topbar-right">
+          <div id="population">Population: <span id="population-value">14</span></div>
+          <div id="banked-gold">Gold: <span id="banked-gold-value">0</span></div>
+          <div id="score-display" title="Total score: sum of your surviving defenders' remaining HP after every cleared level">Score: <span id="score-value">0</span></div>
+          <button id="leaderboard-btn" title="See the top runs from every player">Leaderboard</button>
+          <button id="shop-toggle-btn" title="Spend banked Gold on permanent unit upgrades">Upgrades</button>
+          <button id="backpack-toggle-btn" title="View items dropped by raiders — activate up to 6 to affect combat">Items <span id="backpack-count">(0)</span></button>
+          <button id="how-to-play-btn" title="Show the how-to-play instructions again">How to Play</button>
+          <button id="reset-level-btn" title="Restart the current level">Reset Level</button>
+          <button id="reset-game-btn" title="Wipe ALL saved progress and start over">Reset Game</button>
+        </div>
+      </div>
+
+      <div id="item-drop-toast"></div>
+
+      <div id="unit-selector">
+        <button class="unit-btn selected" data-type="knight">
+          Knight <span class="cost">3 pop</span>
+        </button>
+        <button class="unit-btn" data-type="archer">
+          Archer <span class="cost">2 pop</span>
+        </button>
+        <button class="unit-btn" data-type="mage">
+          Mage <span class="cost">4 pop</span>
+        </button>
+      </div>
+
+      <div id="instructions">
+        Select a unit above, then click the green half of the map to place it.
+      </div>
+
+      <button id="start-battle-btn" disabled>Start Battle</button>
+
+      <div id="result-banner" class="hidden">
+        <div id="result-text"></div>
+        <div id="result-evolution-line" class="hidden"></div>
+        <div id="result-summary-line" class="hidden"></div>
+        <div id="score-submit" class="hidden">
+          <div id="score-submit-prompt">Put your run on the leaderboard:</div>
+          <div id="score-submit-row">
+            <input id="score-submit-name" type="text" maxlength="24" placeholder="Your name" autocomplete="nickname" spellcheck="false" />
+            <button id="score-submit-btn">Submit</button>
+          </div>
+          <div id="score-submit-status" class="hidden"></div>
+        </div>
+        <button id="result-primary-btn"></button>
+      </div>
+
+      <div id="shop-panel" class="hidden">
+        <div id="shop-header">
+          <div id="shop-title">Upgrades</div>
+          <div id="shop-reward-line" class="hidden"></div>
+          <div id="shop-interest-line" class="hidden"></div>
+          <div id="shop-gold"><span id="shop-gold-value">0</span> Gold banked</div>
+        </div>
+        <div id="shop-upgrades"></div>
+        <div id="shop-actions">
+          <button id="shop-primary-btn">Close</button>
+        </div>
+      </div>
+
+      <div id="backpack-panel" class="hidden">
+        <div id="backpack-header">
+          <div id="backpack-title">Items</div>
+          <div id="backpack-active-count">Active: 0/6</div>
+        </div>
+        <div id="backpack-lock-note" class="hidden">Activate or deactivate items before placing your first defender this level.</div>
+        <div id="backpack-body"></div>
+        <div id="backpack-actions">
+          <button id="backpack-close-btn">Close</button>
+        </div>
+      </div>
+
+      <div id="defender-stats-panel" class="corner-panel hidden">
+        <div id="defender-stats-title" class="corner-panel-title">Defender Stats</div>
+        <div id="defender-stats-body"></div>
+      </div>
+
+      <div id="attacker-stats-panel" class="corner-panel hidden">
+        <div id="attacker-stats-title" class="corner-panel-title">Attacker Stats</div>
+        <div id="attacker-stats-body"></div>
+      </div>
+
+      <div id="upcoming-panel" class="corner-panel hidden">
+        <div id="upcoming-title" class="corner-panel-title">Upcoming Levels</div>
+        <div id="upcoming-body"></div>
+      </div>
+
+      <div id="bottombar">
+        <div id="bottombar-left">
+          <button id="defender-stats-toggle-btn" title="See current defender stats, including upgrades">Defender Stats</button>
+          <button id="attacker-stats-toggle-btn" title="See current raider stats for the upcoming battle">Attacker Stats</button>
+        </div>
+        <div id="army-health-row" title="Total live health for each side — sum of every unit's current HP out of the army's total starting HP">
+          <div class="army-health-bar" id="defender-health-bar">
+            <span class="army-health-label">Defenders</span>
+            <div class="army-health-track">
+              <div class="army-health-fill" id="defender-health-fill"></div>
+            </div>
+            <span class="army-health-value" id="defender-health-value">100%</span>
+          </div>
+          <div class="army-health-bar" id="raider-health-bar">
+            <span class="army-health-label">Raiders</span>
+            <div class="army-health-track">
+              <div class="army-health-fill" id="raider-health-fill"></div>
+            </div>
+            <span class="army-health-value" id="raider-health-value">100%</span>
+          </div>
+        </div>
+        <div id="bottombar-right">
+          <button id="feedback-btn" title="Report a bug or tell us what you think">Feedback</button>
+          <button id="upcoming-toggle-btn" title="See what level types are coming up, so you can prepare">Upcoming</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="intro-modal" class="hidden">
+      <div id="intro-modal-box">
+        <div id="intro-modal-title">How to Play</div>
+        <div id="intro-modal-subtitle">Defend your city from waves of raiders.</div>
+        <ul id="intro-modal-list">
+          <li>A wave of raiders is coming for your city. Take a look at what's headed your way before you act.</li>
+          <li>Pick a unit on the left, then click your side of the map to place it. Each unit costs Population, so spend it wisely.</li>
+          <li>Once you start the battle, it plays out on its own — no further input from you. Just watch how your placement holds up.</li>
+          <li>Clear a level to earn Gold for permanent Upgrades and collect Items dropped by raiders.</li>
+          <li>High ground gives a damage bonus, and cliffs block melee attacks — use the terrain.</li>
+          <li>If your defenders are wiped out, your City Health takes damage. Get it to 0 and the run ends.</li>
+        </ul>
+        <button id="intro-modal-close-btn">Got it, let's go</button>
+      </div>
+    </div>
+
+    <div id="leaderboard-modal" class="hidden">
+      <div id="leaderboard-box">
+        <div id="leaderboard-title">Leaderboard</div>
+        <div id="leaderboard-subtitle">Top runs, ranked by final Score.</div>
+        <div id="leaderboard-body"></div>
+        <button id="leaderboard-close-btn">Close</button>
+      </div>
+    </div>
+
+    <div id="feedback-modal" class="hidden">
+      <div id="feedback-box">
+        <div id="feedback-title">Send Feedback</div>
+        <div id="feedback-subtitle">Bugs, balance gripes, ideas — all welcome.</div>
+        <textarea id="feedback-message" maxlength="2000" rows="5" placeholder="What's on your mind?"></textarea>
+        <input id="feedback-contact" type="text" maxlength="200" placeholder="Email or handle (optional, if you'd like a reply)" spellcheck="false" />
+        <div id="feedback-note">Your current level and score are attached automatically.</div>
+        <div id="feedback-status" class="hidden"></div>
+        <div id="feedback-actions">
+          <button id="feedback-cancel-btn">Cancel</button>
+          <button id="feedback-send-btn">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="confirm-modal" class="hidden">
+      <div id="confirm-modal-box">
+        <div id="confirm-modal-message"></div>
+        <div id="confirm-modal-actions">
+          <button id="confirm-modal-cancel-btn">Cancel</button>
+          <button id="confirm-modal-confirm-btn">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
